@@ -180,24 +180,23 @@ class GithubDownload(threading.Thread):
         :return: The return value is a string.
         """
         unit_data = {
-                    "B" : {
-                            "unit" : _bytes < 1000,
-                            "div" : 1},
-                    "KB" : {
-                            "unit" : all([_bytes >= 1000, _bytes < 1000000]),
-                            "div" : 1000},
-                    "MB" : {
-                            "unit" : all([_bytes >= 1000000, _bytes < 1000000000]),
-                            "div" : 1000000},
-                    "GB" : {
-                            "unit" : _bytes >= 1000000000,
-                            "div" : 1000000000}
-                    }
+                "B" : {
+                        "unit" : _bytes < 1024.0,
+                        "div" : 1.0},
+                "KB" : {
+                        "unit" : all([_bytes >= 1024.0, _bytes < 1048576.0]),
+                        "div" : 1024.0},
+                "MB" : {
+                        "unit" : all([_bytes >= 1048576.0, _bytes < 1073741824.0]),
+                        "div" : 1048576.0},
+                "GB" : {
+                        "unit" : _bytes >= 1073741824.0,
+                        "div" : 1073741824.0}
+                }
  
         for i in unit_data:
             if unit_data[i]["unit"]:
-                result = _bytes / unit_data[i]["div"]
-                return "%.02f %s" % (result, i)
+                return "%.02f %s" % (float(_bytes) / unit_data[i]["div"], i)
 
     @property
     def sizelist(self):
