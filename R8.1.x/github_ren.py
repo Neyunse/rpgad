@@ -11,7 +11,7 @@
 # How to use in .rpy
 #
 # define git_token = "<TOKEN>"
-# define git_repo = "Neyunse/Silent-Love"
+# define git_repo = "<OWNER>/<REPO>"
 #
 # screen package_dl():
 #     vbox:
