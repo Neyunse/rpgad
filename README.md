@@ -1,6 +1,6 @@
 # Ren'Py Private github asset download
 
-clone this repo and paste all files was inside `/R8.1.X` folder in `/game`
+clona este repositorio y pega todos los archivos que están en `/R8.1.X` dentro de `/game`
 
 this system is based on [RADC](https://github.com/CharlieFuu69/RenPy_Asset_Download_Complement)
 
