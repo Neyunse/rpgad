@@ -38,25 +38,23 @@ init python:
 
 import requests, os, threading
 class GithubDownload(threading.Thread):
+    """
+    This class initializes the class with the repo name, the token, and the download path
+    
+    :param repo: The name of the repository you want to download
+    :param token: The token you created in the previous step
+    :param dl_path: The path to the directory where you want to download the packages, defaults to
+    packages (optional)
+    """
 
-    def __init__(self, repo, token, filename ,dl_path):
-        super(GithubDownload, self).__init__()
+    def __init__(self, settings):
+        threading.Thread.__init__(self)
+        self.repo = settings["git_repo"]
+        self.token = settings["git_token"]
+        self.path = settings["path"]
+        self.git_release_name = settings["git_release_name"]
+        self.filename = settings["filename"]
 
-        """
-        This function initializes the class with the repo name, the token, and the download path
-        
-        :param repo: The name of the repository you want to download
-        :param token: The token you created in the previous step
-        :param dl_path: The path to the directory where you want to download the packages, defaults to
-        packages (optional)
-        """
-
-        self.repo = repo
-        self.token = token
-        self.path = dl_path
-        self.filename = filename
-
-        
         self.length = 0
         self.dl = 0.0
         self.raw_length = 0
@@ -64,28 +62,38 @@ class GithubDownload(threading.Thread):
         self.percent = 0.0
         self.dl_progress = ""
         self.dl_status = False
+        self.dl_error = False
+        self.dl_error_message = ""
 
-    def get_latest_releases(self):
+    def get_releases(self):
         """
         It takes the repo name and the token and returns the latest release of the repo
         """
-        
-        url = "https://api.github.com/repos/{}/releases/latest".format(
+
+        url = "https://api.github.com/repos/{}/releases".format(
             self.repo)
         try:
             r = requests.get(url, headers={
                 'Authorization': 'Bearer {}'.format(self.token)
             })
 
-            result = r.json()
+            if r.status_code != 200:
+                message = r.json()["message"]
+                raise Exception(message)
 
-            return result
+            r_result = r.json()
+
+            filter_result = None
+            for obj in r_result:
+                if obj["name"] == self.git_release_name:
+                    filter_result = obj
+
+            return filter_result
 
         except Exception as e:
+            self.dl_error = True
+            self.dl_error_message = str(e)
             print(e)
-        finally:
-            
-            renpy.restart_interaction()
 
     def search_in_assets(self):
         """
@@ -95,31 +103,29 @@ class GithubDownload(threading.Thread):
         :param name: The name of the asset you want to download
         :return: the result of the get_asset_by_id function.
         """
-       
+
         try:
-            latest = self.get_latest_releases()
+            latest = self.get_releases()
 
-            asset_list = latest['assets_url']
+            if latest:
+                asset_list = latest['assets_url']
 
-            assets = requests.get(asset_list, headers={
-                
-                'Authorization': 'Bearer {}'.format(self.token)
-            })
+                assets = requests.get(asset_list, headers={
 
-            asset_result = assets.json()
+                    'Authorization': 'Bearer {}'.format(self.token)
+                })
 
-            search_asset = [element for element in asset_result if element['name'] == self.filename]
+                asset_result = assets.json()
 
-            id = search_asset[0]["id"]
+                search_asset = [
+                    element for element in asset_result if element['name'] == self.filename]
 
-        
-            return self.get_asset_by_id(id, self.filename)
+                id = search_asset[0]["id"]
+
+                return self.get_asset_by_id(id, self.filename)
 
         except Exception as e:
             print(e)
-        finally:
-            
-            renpy.restart_interaction()
 
     def get_asset_by_id(self, id, filename):
         """
@@ -130,17 +136,34 @@ class GithubDownload(threading.Thread):
         """
         try:
             url = "https://api.github.com/repos/{}/releases/assets/{}".format(
-            self.repo, id)
-            asset = requests.get(url, headers={
-                'Content-Type': 'application/octet-stream',
-                'accept': "application/octet-stream",
-                'Authorization': 'Bearer {}'.format(self.token)
-            }, stream=True)
+                self.repo, id)
+            base = os.path.normpath(renpy.config.gamedir)
 
-            base = os.path.normpath(config.gamedir)
-            outfile = open(base+'/{}/{}'.format(self.path,filename), 'wb')
-            outfile.write(asset.content)
-            
+            existSize = 0
+            write_type = "wb"
+            headers = {}
+            if os.path.exists(f"{base}/{self.path}/{filename}"):
+                write_type = "ab"
+                existSize = os.path.getsize(f"{base}/{self.path}/{filename}")
+                headers = {
+                    'Content-Type': 'application/octet-stream',
+                    'accept': "application/octet-stream",
+                    'Range': "bytes=%s-" % (existSize),
+                    'Authorization': 'Bearer {}'.format(self.token)
+                }
+            else:
+                headers = {
+                    'Content-Type': 'application/octet-stream',
+                    'accept': "application/octet-stream",
+                    'Authorization': 'Bearer {}'.format(self.token)
+                }
+
+            asset = requests.get(
+                url,
+                headers=headers,
+                stream=True
+
+            )
 
             dl = 0.0
 
@@ -150,27 +173,25 @@ class GithubDownload(threading.Thread):
 
             self.length = round(total_length / 1000, 2)
 
+            with open(f"{base}/{self.path}/{filename}", write_type) as f:
+                for chunk in asset.iter_content(chunk_size=1024):
 
-            for data in asset.iter_content(chunk_size=4096):
-                dl += len(data)
-                self.raw_dl = dl
-                self.dl = round(dl / 1000, 2)
-                self.percent = 100 * (self.dl/self.length)
-                self.dl_progress = "%.02f MB / %.02f MB" % (self.dl, self.length)
-                self.dl_status = False
-                
-             
-                 
-            if self.dl >= self.length:
-                outfile.close()
-                asset.close()
-            
+                    dl += len(chunk)
+                    self.raw_dl = dl
+                    self.dl = round(dl / 1000, 2)
+                    self.percent = 100 * (self.dl/self.length)
+                    self.dl_progress = "%.02f MB / %.02f MB" % (
+                        self.dl, self.length)
+                    if chunk:
+                        f.write(chunk)
         except Exception as e:
-            print(e)
+            self.dl_status = False
+            self.dl_error_message = True
+            self.dl_error_message = ""
         finally:
             self.dl_status = True
-            renpy.restart_interaction()
- 
+
+
     def unit_formatter(self, _bytes):
         """
         It takes a number of bytes and returns a string with the number of bytes formatted to the
@@ -180,20 +201,20 @@ class GithubDownload(threading.Thread):
         :return: The return value is a string.
         """
         unit_data = {
-                "B" : {
-                        "unit" : _bytes < 1024.0,
-                        "div" : 1.0},
-                "KB" : {
-                        "unit" : all([_bytes >= 1024.0, _bytes < 1048576.0]),
-                        "div" : 1024.0},
-                "MB" : {
-                        "unit" : all([_bytes >= 1048576.0, _bytes < 1073741824.0]),
-                        "div" : 1048576.0},
-                "GB" : {
-                        "unit" : _bytes >= 1073741824.0,
-                        "div" : 1073741824.0}
-                }
- 
+            "B": {
+                "unit": _bytes < 1024.0,
+                "div": 1.0},
+            "KB": {
+                "unit": all([_bytes >= 1024.0, _bytes < 1048576.0]),
+                "div": 1024.0},
+            "MB": {
+                "unit": all([_bytes >= 1048576.0, _bytes < 1073741824.0]),
+                "div": 1048576.0},
+            "GB": {
+                "unit": _bytes >= 1073741824.0,
+                "div": 1073741824.0}
+        }
+
         for i in unit_data:
             if unit_data[i]["unit"]:
                 return "%.02f %s" % (float(_bytes) / unit_data[i]["div"], i)
@@ -216,9 +237,9 @@ class GithubDownload(threading.Thread):
         """
 
         try:
-            return self.search_in_assets()
+            self.search_in_assets()
         except Exception as e:
-                print(e)
-        finally:
-            
-            renpy.restart_interaction()
+            self.dl_error_message = True
+            self.dl_error_message = e
+            print(e)
+
