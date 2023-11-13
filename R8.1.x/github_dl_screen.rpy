@@ -2,14 +2,18 @@ init python:
     config.per_frame_screens.append("Download")
 
 # uncomment this defines and configure your token and repo
-# define git_token = "<TOKEN>"
-# define git_repo = "<OWNER>/<REPO>"
+#call screen downloader(settings={
+#        "git_repo": "", # User/repo
+#        "git_token": "",
+#        "path": "packages",
+#        "filename": "download.jpg",
+#        "git_release_name": "ROL"
+#    })
 
-
-screen Download(filename, dl_path="packages"):
+screen Download(settings={}):
     zorder 49000
     modal True
-    default dl = GithubDownload(git_repo, git_token, filename, dl_path)
+    default dl = GithubDownload(settings["git_repo"], settings["git_token"], settings["filename"], settings["dl_path"])
     on "show" action Function(dl.start)
 
     if dl.dl_status:
