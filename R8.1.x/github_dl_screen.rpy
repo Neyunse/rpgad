@@ -13,7 +13,7 @@ init python:
 screen Download(settings={}):
     zorder 49000
     modal True
-    default dl = GithubDownload(settings["git_repo"], settings["git_token"], settings["filename"], settings["dl_path"])
+    default dl = GithubDownload(settings["git_repo"], settings["git_token"], settings["filename"], settings["path"])
     on "show" action Function(dl.start)
 
     if dl.dl_status:
