@@ -6,8 +6,8 @@ init python:
 #        "git_repo": "", # User/repo
 #        "git_token": "",
 #        "path": "packages",
-#        "filename": "download.jpg",
-#        "git_release_name": "ROL"
+#        "filename": "",
+#        "git_release_name": ""
 #    })
 
 screen Download(settings={}):
