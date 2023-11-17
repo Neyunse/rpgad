@@ -8,26 +8,6 @@
 # But you can copy and paste the imports and class 
 # inside the init python block 
 ########################################################################
-# How to use in .rpy
-#
-# define git_token = "<TOKEN>"
-# define git_repo = "<OWNER>/<REPO>"
-#
-# screen package_dl():
-#     vbox:
-#       textbutton "Download package" action Show("confirm", message="Would you like to install this package?",yes_action=Show("Download", filename="pa_lang_en.rpa", dl_path="./"), no_action=Return())
-#
-#
-#
-# label start:
-#     show screen package_dl
-#
-#
-# explanation:
-# Screen: Download(filename, dl_path="pakages")
-#       - filename: full name of the file in Github Release ex: "pakage_lang.zip"
-#       - if dl_path is not provided, the default download folder is pakages. (the folder need exist)
-# 
 # How to get github token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
 ####
 
@@ -37,7 +17,9 @@ init python:
 """
 
 import requests, os, threading
+
 class GithubDownload(threading.Thread):
+
     """
     This class initializes the class with the repo name, the token, and the download path
     
@@ -122,29 +104,46 @@ class GithubDownload(threading.Thread):
 
                 id = search_asset[0]["id"]
 
-                return self.get_asset_by_id(id, self.filename)
+                return self.get_asset_by_id(id)
 
         except Exception as e:
             print(e)
 
-    def get_asset_by_id(self, id, filename):
+    def get_asset_by_id(self, id):
         """
-        It downloads a file from a url and saves it to a directory.
-
-        :param id: The id of the asset you want to download
-        :param filename: The name of the file you want to download
+        The function `get_asset_by_id` downloads a file from a GitHub release by its ID.
+        
+        :param id: The `id` parameter in the `get_asset_by_id` function is used to specify the ID of the
+        asset you want to retrieve. It is used to construct the URL for the API request to the GitHub
+        API
         """
         try:
             url = "https://api.github.com/repos/{}/releases/assets/{}".format(
                 self.repo, id)
+
+            self.DownloadFile(url)
+
+        except Exception as e:
+            self.dl_error_message = True
+            self.dl_error_message = ""
+
+    def DownloadFile(self, url):
+        """
+        The function `DownloadFile` is used to download a file from a given URL, with the ability to
+        resume the download if it was interrupted.
+        
+        :param url: The `url` parameter is the URL of the file that you want to download
+        """
+        try:
             base = os.path.normpath(renpy.config.gamedir)
 
             existSize = 0
             write_type = "wb"
             headers = {}
-            if os.path.exists(f"{base}/{self.path}/{filename}"):
+            if os.path.exists(f"{base}/{self.path}/{self.filename}"):
                 write_type = "ab"
-                existSize = os.path.getsize(f"{base}/{self.path}/{filename}")
+                existSize = os.path.getsize(
+                    f"{base}/{self.path}/{self.filename}")
                 headers = {
                     'Content-Type': 'application/octet-stream',
                     'accept': "application/octet-stream",
@@ -173,7 +172,7 @@ class GithubDownload(threading.Thread):
 
             self.length = round(total_length / 1000, 2)
 
-            with open(f"{base}/{self.path}/{filename}", write_type) as f:
+            with open(f"{base}/{self.path}/{self.filename}", write_type) as f:
                 for chunk in asset.iter_content(chunk_size=1024):
 
                     dl += len(chunk)
@@ -190,6 +189,8 @@ class GithubDownload(threading.Thread):
             self.dl_error_message = ""
         finally:
             self.dl_status = True
+
+
 
 
     def unit_formatter(self, _bytes):
